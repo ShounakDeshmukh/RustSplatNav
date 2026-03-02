@@ -1,0 +1,28 @@
+# Build artifacts
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Colcon
+ros2_ws/.colcon/
+
+# Nerf models and datasets
+nerf/datasets/
+nerf/models/
+
+# Logs
+logs/
+
+# Python
+__pycache__/
+*.pyc
+
+# Rust
+target/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+EOF
