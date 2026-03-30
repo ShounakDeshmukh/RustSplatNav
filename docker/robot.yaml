@@ -1,0 +1,28 @@
+serial_number: j100-0000
+version: 0
+system:
+  hosts:
+    - hostname: localhost
+      ip: 127.0.0.1
+  ros2:
+    namespace: j100
+platform:
+  model: j100
+sensors:
+  camera:
+    - model: intel_realsense
+      urdf_enabled: true
+      launch_enabled: true
+      parent: base_link
+      xyz: [0.15, 0.0, 0.2]
+      rpy: [0.0, 0.0, 0.0]
+      ros_parameters:
+        intel_realsense:
+          camera_name: camera_0
+          device_type: d435
+          serial_no: "0"
+          enable_color: true
+          rgb_camera.color_profile: 640,480,30
+          enable_depth: true
+          depth_module.depth_profile: 640,480,15
+          pointcloud.enable: true

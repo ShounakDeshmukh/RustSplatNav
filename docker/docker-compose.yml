@@ -1,0 +1,33 @@
+services:
+  ros2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ros2_jackal_nerf
+    ports:
+      - "8765:8765" # Foxglove default WebSocket port
+    ipc: host
+    # runtime: nvidia
+    # environment:
+    #   - NVIDIA_VISIBLE_DEVICES=all
+    #   - NVIDIA_DRIVER_CAPABILITIES=all
+    environment:
+      - DISPLAY=${DISPLAY:-:1}
+      - QT_X11_NO_MITSHM=1
+      - LIBGL_ALWAYS_SOFTWARE=1 # Fixes RViz getting stuck on splash screen
+      - XAUTHORITY=/tmp/.docker.xauth
+    volumes:
+      # X11 forwarding for Gazebo / RViz
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Generated with docker/setup-x11.sh from the active display cookie
+      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
+      # ROS2 workspace
+      - ../ros2_ws:/workspace
+      # Nerf datasets / models / scripts
+      - ../nerf:/nerf
+      # Logs and experiment outputs
+      - ../logs:/logs
+      # Clearpath config (mapped so you don't have to rebuild when changing sensors)
+      - ./robot.yaml:/root/clearpath/robot.yaml:ro
+    stdin_open: true
+    tty: true

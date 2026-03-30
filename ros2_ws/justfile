@@ -1,0 +1,27 @@
+# /workspace/justfile
+
+default:
+    @just --list
+
+# Build the ROS2 workspace
+build:
+    colcon build --symlink-install
+
+# Run a command with ROS and ros2_rust environments sourced
+source-ros cmd:
+    bash -lc 'source /opt/ros/jazzy/setup.bash && source /opt/ros2_rust_ws/install/setup.bash && {{cmd}}'
+
+# Run the Rust cmd_vel publisher node
+run-rust: (source-ros "cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source /workspace/install/setup.bash && ros2 run spin_robot_node spin_robot_node")
+
+# Launch the Jackal simulation
+launch-sim rviz="":
+    ros2 launch clearpath_gz simulation.launch.py {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }}
+
+# List available ROS2 topics
+topics:
+    ros2 topic list
+
+# Launch foxglove bridge
+launch-foxglove:
+    ros2 launch foxglove_bridge foxglove_bridge_launch.xml
