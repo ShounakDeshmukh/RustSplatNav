@@ -113,6 +113,10 @@ sudo loginctl disable-linger "$USER" || true
 git config --global user.name "Shounak Deshmukh"
 git config --global user.email "shounsach@gmail.com"
 
+echo "Setup X11 forwarding"
+chmod +x /docker/setup-x11.sh
+./docker/setup-x11.sh
+
 echo "[6/6] Done."
 echo "Open a new shell (or run: newgrp docker) for docker group changes to apply."
 echo "Then run: vncpasswd"
