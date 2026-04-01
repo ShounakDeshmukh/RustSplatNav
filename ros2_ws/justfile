@@ -17,7 +17,11 @@ run-rust: (source-ros "cd /workspace && colcon build --packages-select spin_robo
 # Launch the Jackal simulation
 launch-sim rviz="":
         mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
-        env -u GZ_PARTITION -u IGN_PARTITION XDG_RUNTIME_DIR=/tmp/runtime-root \
+        XDG_RUNTIME_DIR=/tmp/runtime-root \
+        GZ_PARTITION=jackal_sim \
+        IGN_PARTITION=jackal_sim \
+        GZ_IP=127.0.0.1 \
+        IGN_IP=127.0.0.1 \
             ros2 launch clearpath_gz simulation.launch.py {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }}
 
 # List available ROS2 topics

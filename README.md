@@ -155,9 +155,16 @@ Inside the container, test GUI first:
 xeyes
 ```
 
+Then launch simulation with the preconfigured env:
+```bash
+cd /workspace
+just launch-sim
+```
+
 Notes:
 - `docker-compose.yml` uses `network_mode: host`, which is required for SSH X11 forwarding because `localhost:10.0` must resolve to the host SSH tunnel, not container loopback.
 - `setup-x11.sh` supports both local/VNC displays (`:0`, `:1`) and SSH-forwarded displays (`localhost:10.0`).
+- `just launch-sim` sets `XDG_RUNTIME_DIR`, `GZ_PARTITION`, `IGN_PARTITION`, `GZ_IP`, and `IGN_IP` so Gazebo server/client and `ros_gz_sim` discover each other reliably.
 
 Inside the container, set up the isolated math environments:
 ```bash
