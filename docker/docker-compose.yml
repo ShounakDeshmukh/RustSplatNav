@@ -8,14 +8,13 @@ services:
     # container must share host network namespace so localhost tunnel is reachable.
     network_mode: host
     ipc: host
-    # runtime: nvidia
-    # environment:
-    #   - NVIDIA_VISIBLE_DEVICES=all
-    #   - NVIDIA_DRIVER_CAPABILITIES=all
+    runtime: nvidia
     environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
       - DISPLAY=${DISPLAY:-:1}
       - QT_X11_NO_MITSHM=1
-      - LIBGL_ALWAYS_SOFTWARE=1 # Fixes RViz getting stuck on splash screen
+      - LIBGL_ALWAYS_SOFTWARE=0 # Keep hardware GL default; enable software mode per-command if needed
       - XAUTHORITY=/tmp/.docker.xauth
     volumes:
       # X11 forwarding for Gazebo / RViz

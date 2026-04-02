@@ -14,15 +14,40 @@ source-ros cmd:
 # Run the Rust cmd_vel publisher node
 run-rust: (source-ros "cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source /workspace/install/setup.bash && ros2 run spin_robot_node spin_robot_node")
 
-# Launch the Jackal simulation
-launch-sim rviz="":
-        mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
-        XDG_RUNTIME_DIR=/tmp/runtime-root \
-        GZ_PARTITION=jackal_sim \
-        IGN_PARTITION=jackal_sim \
-        GZ_IP=127.0.0.1 \
-        IGN_IP=127.0.0.1 \
-            ros2 launch clearpath_gz simulation.launch.py {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }}
+# Launch the Jackal simulation using hardware OpenGL by default.
+# `renderer` can be `ogre` or `ogre2`.
+launch-sim rviz="" renderer="ogre2" extra_args="":
+    mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
+    XDG_RUNTIME_DIR=/tmp/runtime-root \
+    GZ_PARTITION=jackal_sim \
+    IGN_PARTITION=jackal_sim \
+    GZ_IP=127.0.0.1 \
+    IGN_IP=127.0.0.1 \
+    QT_X11_NO_MITSHM=1 \
+    LIBGL_ALWAYS_SOFTWARE=0 \
+    __GLX_VENDOR_LIBRARY_NAME=nvidia \
+    GZ_RENDER_ENGINE={{renderer}} \
+    IGN_RENDER_ENGINE={{renderer}} \
+        ros2 launch clearpath_gz simulation.launch.py {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }} {{extra_args}}
+
+# Launch without RViz and request headless Gazebo mode when supported.
+launch-sim-headless:
+    just launch-sim "rviz:=false" "ogre2" "headless:=true gui:=false"
+
+# Launch with software rendering (use only when hardware GL is unavailable).
+launch-sim-software rviz="" renderer="ogre" extra_args="":
+    mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root
+    XDG_RUNTIME_DIR=/tmp/runtime-root \
+    GZ_PARTITION=jackal_sim \
+    IGN_PARTITION=jackal_sim \
+    GZ_IP=127.0.0.1 \
+    IGN_IP=127.0.0.1 \
+    QT_X11_NO_MITSHM=1 \
+    LIBGL_ALWAYS_SOFTWARE=1 \
+    MESA_LOADER_DRIVER_OVERRIDE=llvmpipe \
+    GZ_RENDER_ENGINE={{renderer}} \
+    IGN_RENDER_ENGINE={{renderer}} \
+        ros2 launch clearpath_gz simulation.launch.py {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }} {{extra_args}}
 
 # List available ROS2 topics
 topics:
