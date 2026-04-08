@@ -39,6 +39,7 @@ RUN apt-get update && apt-get install -y \
     tmux \
     ranger \
     just \
+    eog \
     && rm -rf /var/lib/apt/lists/*
 
 # -----------------------
