@@ -41,7 +41,7 @@ launch-foxglove:
 
 # Setup GauSS-MI conda environment
 setup-gaussmi:
-    /usr/local/bin/setup-gaussmi-env
+    bash /workspace/src/GauSS-MI-ros2/setup-gaussmi-env.sh
 
 # Launch GauSS-MI with active reconstruction config.
 launch-gaussmi-active: (source-ros "cd /workspace && source install/setup.bash && conda activate GauSS-MI && ros2 launch gs_mapping gaussmi_active.launch.py")
