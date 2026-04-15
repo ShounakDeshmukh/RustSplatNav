@@ -24,7 +24,6 @@ RUN set -eux; \
 # -----------------------
 RUN apt-get update && apt-get install -y \
     curl \
-    wget \
     git \
     python3-pip \
     python3-yaml \
@@ -55,7 +54,18 @@ RUN apt-get update && apt-get install -y \
     ranger \
     just \
     eog \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Repair occasional FastRTPS/FastCDR ABI mismatches seen by gz sim.
+# This is a reinstall of already-required ROS middleware packages, not new features.
+RUN apt-get update && apt-get install -y --reinstall --no-install-recommends \
+    ros-jazzy-fastcdr \
+    ros-jazzy-fastrtps \
+    ros-jazzy-rmw-fastrtps-cpp \
+    ros-jazzy-rmw-fastrtps-shared-cpp \
+    ros-jazzy-rosidl-typesupport-fastrtps-cpp \
+    ros-jazzy-controller-manager-msgs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* && ldconfig
 
 # -----------------------
 # Prepare your personal workspace
@@ -74,18 +84,6 @@ RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc && \
 # (robot.yaml is mounted at runtime via docker-compose)
 # -----------------------
 RUN mkdir -p /root/clearpath
-
-# -----------------------
-# Install Miniconda for GauSS-MI/PINGS Python environments (at the end, after ROS build)
-# -----------------------
-RUN wget -qO /tmp/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
-    bash /tmp/miniconda.sh -b -p /opt/conda && \
-    rm -f /tmp/miniconda.sh && \
-    /opt/conda/bin/conda config --set auto_activate_base false && \
-    /opt/conda/bin/conda init bash
-
-# Make conda available in interactive shells without forcing conda python globally.
-RUN echo "source /opt/conda/etc/profile.d/conda.sh" >> /root/.bashrc
 
 # -----------------------
 # Default command

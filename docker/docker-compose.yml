@@ -60,27 +60,20 @@ services:
       ros2 run gaussmi_relay ros2_side --ros-args \
       -p rgb_topic:=/j100/sensors/camera_0/color/image \
       -p depth_topic:=/j100/sensors/camera_0/depth/image \
-      -p pose_topic:= \
       -p odom_topic:=/j100/platform/odom/filtered \
       -p nbv_topic:=/gaussmi/nbv_pose"
     stdin_open: true
     tty: true
 
   gaussmi_ros1:
-    image: johanna17/gauss-mi:v1
+    build:
+      context: .
+      dockerfile: Dockerfile.gaussmi_ros1_sidecar
     container_name: gaussmi_ros1
-    # ROS 1 Noetic container for the original GauSS-MI codebase.
-    # This runs alongside the ROS 2 container, but topic exchange requires a bridge later.
+    # Minimal ROS 1 Noetic sidecar for relay + roscore only.
     network_mode: host
     ipc: host
-    runtime: nvidia
-    privileged: true
-    cap_add:
-      - SYS_PTRACE
-      - SYS_ADMIN
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
       - DISPLAY=${DISPLAY:-:1}
       - QT_X11_NO_MITSHM=1
       - XAUTHORITY=/tmp/.docker.xauth
@@ -91,9 +84,7 @@ services:
       - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
       - ../relay:/relay:ro
       - ../logs:/logs
-      - /dev:/dev
-    working_dir: /home/do
-    user: do
+    working_dir: /workspace
     command: >
       bash -lc "source /opt/ros/noetic/setup.bash && \
       roscore >/tmp/roscore.log 2>&1 & \
