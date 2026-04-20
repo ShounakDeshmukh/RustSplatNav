@@ -67,6 +67,11 @@ COPY gaussmi /home/do/ws_gaussmi/src/GauSS-MI
 
 RUN source /opt/conda/etc/profile.d/conda.sh && \
     cd /home/do/ws_gaussmi/src/GauSS-MI && \
+    # Keep this patch in Docker (not submodule): ensure torch 1.12 gets compatible Intel runtimes.
+    if ! grep -q '^  - intel-openmp<2024$' environment.yml; then \
+        awk '1; /^  - cudatoolkit=11\.6$/ {print "  - intel-openmp<2024"; print "  - mkl<2024"}' environment.yml > /tmp/environment.yml && \
+        mv /tmp/environment.yml environment.yml; \
+    fi && \
     conda env create -n GauSS-MI -f environment.yml && \
     # Torch 1.12 may fail to import with newer Intel runtimes (missing iJIT_NotifyEvent).
     # Pin compatible OpenMP/MKL packages inside the GauSS-MI env.
