@@ -20,7 +20,7 @@ services:
       # X11 forwarding for Gazebo / RViz
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # Generated with docker/setup-x11.sh from the active display cookie
-      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
+      - ${XAUTH_FILE:-/tmp/.docker.xauth}:/tmp/.docker.xauth:ro
       # ROS2 workspace
       - ../ros2_ws:/workspace
       # Shared relay protocol/scripts
@@ -50,7 +50,7 @@ services:
       - XAUTHORITY=/tmp/.docker.xauth
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
+      - ${XAUTH_FILE:-/tmp/.docker.xauth}:/tmp/.docker.xauth:ro
       - ../ros2_ws:/workspace
       - ../relay:/relay
     command: >
@@ -86,7 +86,7 @@ services:
       - PYTHONPATH=/opt/ros/noetic/lib/python3/dist-packages:/usr/lib/python3/dist-packages
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
+      - ${XAUTH_FILE:-/tmp/.docker.xauth}:/tmp/.docker.xauth:ro
       - ../relay:/relay:ro
       - ../gaussmi:/home/do/ws_gaussmi/src/GauSS-MI
       - ../logs:/logs

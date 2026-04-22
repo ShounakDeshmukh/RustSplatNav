@@ -4,7 +4,17 @@
 
 set -euo pipefail
 
-XAUTH_FILE="/tmp/.docker.xauth"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
+
+# Prefer caller-provided XAUTH_FILE; otherwise use /tmp unless it is not writable.
+if [[ -n "${XAUTH_FILE:-}" ]]; then
+    XAUTH_FILE="$XAUTH_FILE"
+elif [[ -e /tmp/.docker.xauth && ! -w /tmp/.docker.xauth ]]; then
+    XAUTH_FILE="$HOME/.docker.xauth"
+else
+    XAUTH_FILE="/tmp/.docker.xauth"
+fi
 
 if [[ -z "${DISPLAY:-}" ]]; then
     echo "Error: DISPLAY is not set."
@@ -38,8 +48,27 @@ if ! command -v xauth >/dev/null 2>&1; then
     exit 1
 fi
 
+mkdir -p "$(dirname "$XAUTH_FILE")"
 touch "$XAUTH_FILE"
 chmod 600 "$XAUTH_FILE"
+
+# Persist selected host path for docker compose using docker/.env.
+tmp_env="$(mktemp)"
+found_xauth=0
+if [[ -f "$ENV_FILE" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" == XAUTH_FILE=* ]]; then
+            echo "XAUTH_FILE=$XAUTH_FILE" >> "$tmp_env"
+            found_xauth=1
+        else
+            echo "$line" >> "$tmp_env"
+        fi
+    done < "$ENV_FILE"
+fi
+if [[ "$found_xauth" -eq 0 ]]; then
+    echo "XAUTH_FILE=$XAUTH_FILE" >> "$tmp_env"
+fi
+mv "$tmp_env" "$ENV_FILE"
 
 # Rebuild container auth from the active X cookie so root in the container can connect.
 if xauth nlist "$DISPLAY" | sed -e 's/^..../ffff/' | xauth -f "$XAUTH_FILE" nmerge - >/dev/null 2>&1; then
@@ -59,6 +88,7 @@ fi
 
 echo "DISPLAY=$DISPLAY"
 echo "XAUTH file ready: $XAUTH_FILE"
+echo "Compose env updated: $ENV_FILE (XAUTH_FILE=$XAUTH_FILE)"
 if [[ "$is_ssh_x11" == true ]]; then
     echo "Detected SSH-forwarded display. Use host networking for the container so localhost X11 tunnel is reachable."
 fi
