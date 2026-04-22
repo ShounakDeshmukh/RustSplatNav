@@ -14,14 +14,26 @@ source-ros cmd:
 # Run the Python controller node. Set mode=nbv to chase /gaussmi/nbv_pose.
 run-controller mode="spin": (source-ros "cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source /workspace/install/setup.bash && ros2 run spin_robot_node spin_robot_node --ros-args -p mode:={{mode}}")
 
-# Launch Clearpath Nav2 demo stack (Nav2 + SLAM) and NBV bridge.
+# Launch official Clearpath Nav2 stack in simulation mode.
+launch-nav2:
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && ros2 launch clearpath_nav2_demos nav2.launch.py use_sim_time:=true setup_path:=/root/clearpath'
+
+# Launch official Clearpath SLAM stack in simulation mode.
+launch-slam:
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && ros2 launch clearpath_nav2_demos slam.launch.py use_sim_time:=true setup_path:=/root/clearpath'
+
+# Launch only the NBV->NavigateToPose bridge node.
+launch-nbv-bridge:
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source install/setup.bash && ros2 run spin_robot_node nbv_nav2_bridge --ros-args -p nbv_topic:=/gaussmi/nbv_pose -p goal_frame:=map -p navigate_action:=/navigate_to_pose'
+
+# Convenience target: start official Nav2+SLAM and NBV bridge in one launch.
 launch-nav2-nbv:
     bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source install/setup.bash && ros2 launch spin_robot_node clearpath_nav2_nbv.launch.py'
 
 # Launch the Jackal simulation using hardware OpenGL by default.
 # `renderer` can be `ogre` or `ogre2`.
 launch-sim rviz="" renderer="ogre2" extra_args="":
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 LIBGL_ALWAYS_SOFTWARE=0 __GLX_VENDOR_LIBRARY_NAME=nvidia GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }} {{extra_args}}'
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 LIBGL_ALWAYS_SOFTWARE=0 __GLX_VENDOR_LIBRARY_NAME=nvidia GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py setup_path:=/root/clearpath {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }} {{extra_args}}'
 
 # Launch without RViz and request headless Gazebo mode when supported.
 launch-sim-headless:
@@ -29,7 +41,7 @@ launch-sim-headless:
 
 # Launch with software rendering (use only when hardware GL is unavailable).
 launch-sim-software rviz="" renderer="ogre" extra_args="":
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }} {{extra_args}}'
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py setup_path:=/root/clearpath {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }} {{extra_args}}'
 
 # List available ROS2 topics
 topics:

@@ -7,6 +7,7 @@ import pathlib
 import socket
 import sys
 import threading
+import time
 from typing import Optional
 
 import rospy
@@ -27,14 +28,20 @@ class Ros1GaussmiRelay:
         self._port = port
         self._sock: Optional[socket.socket] = None
         self._sock_lock = threading.Lock()
+        self._stats_lock = threading.Lock()
         self._running = True
         self._connected = threading.Event()
+        self._tx_counts = {"rgb": 0, "depth": 0, "pose": 0, "nbv": 0}
+        self._rx_counts = {"rgb": 0, "depth": 0, "pose": 0, "nbv": 0}
+        self._dropped_no_socket = 0
+        self._last_stats_time = time.time()
 
         self._pub_rgb = rospy.Publisher("/camera/bgr", Image, queue_size=10)
         self._pub_depth = rospy.Publisher("/camera/depth", Image, queue_size=10)
         self._pub_pose = rospy.Publisher("/camera/pose", PoseStamped, queue_size=10)
 
         self._sub_nbv = rospy.Subscriber("/gaussmi/nbv_pose", PoseStamped, self._on_nbv_pose, queue_size=10)
+        self._stats_timer = rospy.Timer(rospy.Duration(5.0), self._log_stats)
 
         self._server_thread = threading.Thread(target=self._serve, daemon=True)
         self._server_thread.start()
@@ -83,6 +90,7 @@ class Ros1GaussmiRelay:
                 return
             meta, payload = frame
             stream = meta.get("stream")
+            self._bump_counter(self._rx_counts, str(stream))
             if stream == "rgb":
                 self._pub_rgb.publish(_image_from_meta(meta, payload))
             elif stream == "depth":
@@ -96,14 +104,44 @@ class Ros1GaussmiRelay:
         with self._sock_lock:
             sock = self._sock
         if sock is None:
+            with self._stats_lock:
+                self._dropped_no_socket += 1
             return
         try:
             send_frame(sock, meta, payload)
+            self._bump_counter(self._tx_counts, str(meta.get("stream", "")))
         except OSError as exc:
             rospy.logwarn("ROS 1 relay send failed: %s", exc)
 
     def _on_nbv_pose(self, msg: PoseStamped) -> None:
         self._send(_pose_meta("nbv", msg))
+
+    def _bump_counter(self, counter: dict, key: str) -> None:
+        if key not in counter:
+            return
+        with self._stats_lock:
+            counter[key] += 1
+
+    def _log_stats(self, _event) -> None:
+        with self._sock_lock:
+            connected = self._sock is not None
+        with self._stats_lock:
+            now = time.time()
+            elapsed = max(1e-3, now - self._last_stats_time)
+            self._last_stats_time = now
+            tx = dict(self._tx_counts)
+            rx = dict(self._rx_counts)
+            dropped = self._dropped_no_socket
+            self._dropped_no_socket = 0
+        rospy.loginfo(
+            "Relay stats connected=%s tx(rgb=%d depth=%d pose=%d nbv=%d) "
+            "rx(rgb=%d depth=%d pose=%d nbv=%d) drop_no_socket=%d dt=%.1fs",
+            str(connected).lower(),
+            tx["rgb"], tx["depth"], tx["pose"], tx["nbv"],
+            rx["rgb"], rx["depth"], rx["pose"], rx["nbv"],
+            dropped,
+            elapsed,
+        )
 
     def shutdown(self) -> None:
         self._running = False

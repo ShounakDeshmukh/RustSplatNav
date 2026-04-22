@@ -42,7 +42,12 @@ class GaussmiRos2Relay(Node):
 
         self._sock: Optional[socket.socket] = None
         self._sock_lock = threading.Lock()
+        self._stats_lock = threading.Lock()
         self._running = True
+        self._tx_counts = {"rgb": 0, "depth": 0, "pose": 0, "nbv": 0}
+        self._rx_counts = {"rgb": 0, "depth": 0, "pose": 0, "nbv": 0}
+        self._dropped_no_socket = 0
+        self._last_stats_time = time.time()
 
         self._nbv_pub = self.create_publisher(PoseStamped, self._nbv_topic, 10)
 
@@ -84,6 +89,7 @@ class GaussmiRos2Relay(Node):
 
         self._reader_thread = threading.Thread(target=self._connect_and_read, daemon=True)
         self._reader_thread.start()
+        self._stats_timer = self.create_timer(5.0, self._log_stats)
 
         self.get_logger().info(
             f"ROS 2 relay ready; connecting to ROS 1 relay at {self._peer_host}:{self._peer_port}"
@@ -126,6 +132,7 @@ class GaussmiRos2Relay(Node):
                 return
             meta, payload = frame
             stream = meta.get("stream")
+            self._bump_counter(self._rx_counts, str(stream))
             if stream == "nbv":
                 self._nbv_pub.publish(_pose_from_meta(meta))
             else:
@@ -135,11 +142,43 @@ class GaussmiRos2Relay(Node):
         with self._sock_lock:
             sock = self._sock
         if sock is None:
+            with self._stats_lock:
+                self._dropped_no_socket += 1
             return
         try:
             send_frame(sock, meta, payload)
+            self._bump_counter(self._tx_counts, str(meta.get("stream", "")))
         except OSError as exc:
             self.get_logger().warn(f"ROS 2 relay send failed: {exc}")
+
+    def _bump_counter(self, counter: dict, key: str) -> None:
+        if key not in counter:
+            return
+        with self._stats_lock:
+            counter[key] += 1
+
+    def _log_stats(self) -> None:
+        with self._sock_lock:
+            connected = self._sock is not None
+        with self._stats_lock:
+            now = time.time()
+            elapsed = max(1e-3, now - self._last_stats_time)
+            self._last_stats_time = now
+            tx = dict(self._tx_counts)
+            rx = dict(self._rx_counts)
+            dropped = self._dropped_no_socket
+            self._dropped_no_socket = 0
+        self.get_logger().info(
+            "Relay stats connected=%s tx(rgb=%d depth=%d pose=%d nbv=%d) "
+            "rx(rgb=%d depth=%d pose=%d nbv=%d) drop_no_socket=%d dt=%.1fs"
+            % (
+                str(connected).lower(),
+                tx["rgb"], tx["depth"], tx["pose"], tx["nbv"],
+                rx["rgb"], rx["depth"], rx["pose"], rx["nbv"],
+                dropped,
+                elapsed,
+            )
+        )
 
     def _send_image(self, stream: str, msg: Image) -> None:
         self._send(_image_meta(stream, msg), bytes(msg.data))
