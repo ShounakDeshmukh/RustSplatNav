@@ -29,7 +29,8 @@ class GaussmiRos2Relay(Node):
         self.declare_parameter("rgb_topic", "/camera/bgr")
         self.declare_parameter("depth_topic", "/camera/depth")
         self.declare_parameter("pose_topic", "/camera/pose")
-        self.declare_parameter("odom_topic", "")
+        self.declare_parameter("odom_topic", "/j100/platform/odom/filtered")
+        self.declare_parameter("camera_z_offset", 1.0)
         self.declare_parameter("nbv_topic", "/gaussmi/nbv_pose")
 
         self._peer_host = self.get_parameter("peer_host").value
@@ -38,6 +39,7 @@ class GaussmiRos2Relay(Node):
         self._depth_topic = self.get_parameter("depth_topic").value
         self._pose_topic = self.get_parameter("pose_topic").value
         self._odom_topic = self.get_parameter("odom_topic").value
+        self._camera_z_offset = float(self.get_parameter("camera_z_offset").value)
         self._nbv_topic = self.get_parameter("nbv_topic").value
 
         self._sock: Optional[socket.socket] = None
@@ -92,7 +94,8 @@ class GaussmiRos2Relay(Node):
         self._stats_timer = self.create_timer(5.0, self._log_stats)
 
         self.get_logger().info(
-            f"ROS 2 relay ready; connecting to ROS 1 relay at {self._peer_host}:{self._peer_port}"
+            f"ROS 2 relay ready; connecting to ROS 1 relay at {self._peer_host}:{self._peer_port} "
+            f"with odom_topic={self._odom_topic} camera_z_offset={self._camera_z_offset}m"
         )
 
     def _connect_and_read(self) -> None:
@@ -134,7 +137,12 @@ class GaussmiRos2Relay(Node):
             stream = meta.get("stream")
             self._bump_counter(self._rx_counts, str(stream))
             if stream == "nbv":
-                self._nbv_pub.publish(_pose_from_meta(meta))
+                try:
+                    pose = _pose_from_meta(meta)
+                    self.get_logger().info(f"ROS 2 relay: Publishing NBV pose: {pose.pose.position}")
+                    self._nbv_pub.publish(pose)
+                except Exception as exc:
+                    self.get_logger().error(f"ROS 2 relay: Failed to process NBV: {exc}")
             else:
                 self.get_logger().warn(f"ROS 2 relay received unexpected stream {stream}")
 
@@ -187,7 +195,7 @@ class GaussmiRos2Relay(Node):
         self._send(_pose_meta(stream, msg))
 
     def _send_odom_as_pose(self, msg: Odometry) -> None:
-        self._send(_pose_meta_from_odom("pose", msg))
+        self._send(_pose_meta_from_odom("pose", msg, self._camera_z_offset))
 
     def destroy_node(self):  # type: ignore[override]
         self._running = False
@@ -245,7 +253,7 @@ def _pose_meta(stream: str, msg: PoseStamped) -> dict:
     }
 
 
-def _pose_meta_from_odom(stream: str, msg: Odometry) -> dict:
+def _pose_meta_from_odom(stream: str, msg: Odometry, camera_z_offset: float = 0.0) -> dict:
     return {
         "stream": stream,
         "kind": "pose",
@@ -254,7 +262,7 @@ def _pose_meta_from_odom(stream: str, msg: Odometry) -> dict:
         "position": {
             "x": float(msg.pose.pose.position.x),
             "y": float(msg.pose.pose.position.y),
-            "z": float(msg.pose.pose.position.z),
+            "z": float(msg.pose.pose.position.z) + camera_z_offset,
         },
         "orientation": {
             "x": float(msg.pose.pose.orientation.x),

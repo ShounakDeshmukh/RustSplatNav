@@ -65,6 +65,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.gaussmi_lean
     container_name: gaussmi_ros1
+    runtime: nvidia
     # Lean source-built GauSS-MI image derived from the upstream README.
     network_mode: host
     ipc: host

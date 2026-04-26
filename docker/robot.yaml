@@ -1,20 +1,36 @@
 serial_number: j100-0000
 version: 0
+
 system:
   hosts:
     - hostname: localhost
       ip: 127.0.0.1
   ros2:
     namespace: j100
+
 platform:
   model: j100
+
 sensors:
+  lidar2d:
+    - model: hokuyo_ust
+      urdf_enabled: true
+      launch_enabled: true
+      parent: default_mount
+      xyz: [0.1, 0.0, 0.0]
+      rpy: [0.0, 0.0, 0.0]
+      ros_parameters:
+        hokuyo_node:
+          laser_frame_id: laser_link
+          topic: scan
+          skip: 2 
+
   camera:
     - model: intel_realsense
       urdf_enabled: true
       launch_enabled: true
-      parent: base_link
-      xyz: [0.15, 0.0, 0.2]
+      parent: default_mount
+      xyz: [0.15, 0.0, 0.05]
       rpy: [0.0, 0.0, 0.0]
       ros_parameters:
         intel_realsense:

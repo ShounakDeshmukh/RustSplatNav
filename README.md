@@ -54,50 +54,39 @@ RustSplatNav/
 
 ## Quick Start
 
-### 1. Host setup (first time on a new VM)
+**→ See [STARTUP_GUIDE.md](STARTUP_GUIDE.md) for a complete 0-10 step guide.**
 
-From repo root:
+In summary:
 
-```bash
-cd /home/sdeshmu4/RustSplatNav
-chmod +x setupvm.bash
-./setupvm.bash
-newgrp docker
-```
+1. **Host setup** (first time only):
+   ```bash
+   chmod +x setupvm.bash && ./setupvm.bash && newgrp docker
+   cd docker && ./setup-x11.sh
+   ```
 
-### 2. Prepare X11 auth
+2. **Start stack**:
+   ```bash
+   cd ros2_ws
+   just compose-up-gaussmi
+   ```
 
-```bash
-cd /home/sdeshmu4/RustSplatNav/docker
-./setup-x11.sh
-```
+3. **Launch services** (in ROS 2 container):
+   ```bash
+   docker exec -it ros2_jackal_nerf bash
+   just launch-sim        # Terminal 1: Gazebo simulator
+   just launch-nav2       # Terminal 2: Nav2 + SLAM + RViz
+   ```
 
-### 3. Build and start stack
+4. **Launch GauSS-MI** (in ROS 1 container):
+   ```bash
+   docker exec -it gaussmi_ros1 bash
+   just run-gaussmi-active
+   ```
 
-From `ros2_ws`:
-
-```bash
-cd /home/sdeshmu4/RustSplatNav/ros2_ws
-just compose-up-gaussmi
-```
-
-This starts:
-- `ros2` (ROS 2 Jazzy stack)
-- `gaussmi_relay` (ROS 2 bridge node)
-- `gaussmi_ros1` (official GauSS-MI image)
-
-Stop all:
-
-```bash
-just compose-down-gaussmi
-```
-
-### 4. Enter ROS 2 container and launch sim
-
-```bash
-docker exec -it ros2_jackal_nerf bash
-cd /workspace
-just launch-sim
+5. **Stop all**:
+   ```bash
+   just compose-down-gaussmi
+   ```
 ```
 
 `just launch-sim` now tries GUI first when X11 is reachable and automatically falls back to headless mode if GUI startup fails.

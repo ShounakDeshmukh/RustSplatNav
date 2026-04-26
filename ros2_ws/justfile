@@ -1,60 +1,69 @@
 # /workspace/justfile
+# Clean startup guide: https://github.com/... → STARTUP_GUIDE.md
 
 default:
     @just --list
 
-# Build the ROS2 workspace
-build:
-    colcon build --symlink-install
-
-# Run a command with ROS sourced
-source-ros cmd:
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && {{cmd}}'
-
-# Run the Python controller node. Set mode=nbv to chase /gaussmi/nbv_pose.
-run-controller mode="spin": (source-ros "cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source /workspace/install/setup.bash && ros2 run spin_robot_node spin_robot_node --ros-args -p mode:={{mode}}")
-
-# Launch official Clearpath Nav2 stack in simulation mode.
-launch-nav2:
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && ros2 launch clearpath_nav2_demos nav2.launch.py use_sim_time:=true setup_path:=/root/clearpath'
-
-# Launch official Clearpath SLAM stack in simulation mode.
-launch-slam:
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && ros2 launch clearpath_nav2_demos slam.launch.py use_sim_time:=true setup_path:=/root/clearpath'
-
-# Launch only the NBV->NavigateToPose bridge node.
-launch-nbv-bridge:
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source install/setup.bash && ros2 run spin_robot_node nbv_nav2_bridge --ros-args -p nbv_topic:=/gaussmi/nbv_pose -p goal_frame:=map -p navigate_action:=/navigate_to_pose'
-
-# Convenience target: start official Nav2+SLAM and NBV bridge in one launch.
-launch-nav2-nbv:
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source install/setup.bash && ros2 launch spin_robot_node clearpath_nav2_nbv.launch.py'
-
-# Launch the Jackal simulation using hardware OpenGL by default.
-# Single canonical command for GUI simulation. `renderer` can be `ogre` or `ogre2`.
-launch-sim rviz="" renderer="ogre2]" extra_args="":
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py setup_path:=/root/clearpath {{ if rviz == "true" { "rviz:=true" } else if rviz == "false" { "rviz:=false" } else { rviz } }} {{extra_args}}'
-
-# List available ROS2 topics
-topics:
-    ros2 topic list
-
-# Launch foxglove bridge
-launch-foxglove:
-    ros2 launch foxglove_bridge foxglove_bridge_launch.xml
+# === Docker Orchestration ===
 
 # Bring up the ROS 2 container, the ROS 2 relay, and the ROS 1 GauSS-MI container.
 compose-up-gaussmi:
     docker compose -f ../docker/docker-compose.yml up -d --build ros2 gaussmi_relay gaussmi_ros1
 
-# Shut down the GauSS-MI stack.
+# Shut down all containers.
 compose-down-gaussmi:
     docker compose -f ../docker/docker-compose.yml down
+
+# === Core Simulation & Nav2 ===
+
+# Build the ROS2 workspace (colcon).
+build:
+    colcon build --symlink-install
+
+# Launch the Jackal simulation using hardware OpenGL by default.
+launch-sim rviz="" renderer="ogre2" extra_args="":
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py setup_path:=/root/clearpath {{ if rviz == "true" { "rviz:=true" } else if rviz == "false" { "rviz:=false" } else { rviz } }} {{extra_args}}'
+
+# **REQUIRED**: Launch SLAM (builds the map). Run BEFORE launch-nav2.
+launch-slam:
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && ros2 launch clearpath_nav2_demos slam.launch.py use_sim_time:=true setup_path:=/root/clearpath'
+
+# Launch Nav2 planner/controller (SLAM must be running first).
+launch-nav2:
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && ros2 launch clearpath_nav2_demos nav2.launch.py use_sim_time:=true setup_path:=/root/clearpath'
+
+# === GauSS-MI Active Mapping ===
 
 # Run GauSS-MI active mapping in the ROS1 sidecar (writes results under ../gaussmi/results).
 run-gaussmi-active:
     docker exec -it gaussmi_ros1 bash -lc 'source /opt/ros/noetic/setup.bash && source /opt/conda/etc/profile.d/conda.sh && conda activate GauSS-MI && unset PYTHONPATH && export PYTHONPATH=/opt/ros/noetic/lib/python3/dist-packages && cd /home/do/ws_gaussmi/src/GauSS-MI && python -c "import pathlib,yaml; src=pathlib.Path(\"configs/online_gs_map.yaml\"); dst=pathlib.Path(\"/tmp/online_gs_map_nogui.yaml\"); cfg=yaml.safe_load(src.read_text()); cfg.setdefault(\"Results\", {})[\"use_gui\"]=False; dst.write_text(yaml.safe_dump(cfg, sort_keys=False)); print(f\"Wrote {dst} with Results.use_gui=False\")" && cd /home/do/ws_gaussmi && source devel/setup.bash && roslaunch gs_mapping gaussmi_active.launch gs_config_path:=/tmp/online_gs_map_nogui.yaml'
 
-# Print the latest generated splat on host.
-latest-splat:
-    bash --noprofile --norc -c 'latest=$$(find ../gaussmi/results -type f -path "*/final/point_cloud.ply" 2>/dev/null | sort | tail -n 1); if [[ -n "$$latest" ]]; then echo "$$latest"; else echo "No splat yet under ../gaussmi/results"; fi'
+# Launch NBV→Nav2 bridge (autonomous exploration following GauSS-MI suggestions).
+launch-nbv-bridge:
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source install/setup.bash && ros2 run spin_robot_node nbv_nav2_bridge --ros-args -p nbv_topic:=/gaussmi/nbv_pose -p goal_frame:=map -p navigate_action:=/j100/navigate_to_pose'
+
+# === Debugging & Utilities ===
+
+# List all active ROS 2 topics.
+topics:
+    ros2 topic list
+
+# Echo NBV poses from ROS 1 relay (debug relay connectivity).
+echo-nbv:
+    ros2 topic echo /gaussmi/nbv_pose
+
+# Check ROS 2 relay logs for errors.
+relay-logs:
+    docker logs gaussmi_relay --tail 50
+
+# Verify critical system topics are publishing (diagnostic).
+verify-system:
+    @echo "=== Verifying Critical Topics ===" && \
+    echo "Map:" && ros2 topic list | grep -c "^/j100/map$" && \
+    echo "Lidar:" && ros2 topic list | grep -c "^/j100/sensors/lidar2d_0/scan$" && \
+    echo "NBV Poses:" && ros2 topic list | grep -c "^/gaussmi/nbv_pose$" && \
+    echo "Odometry:" && ros2 topic list | grep -c "^/j100/platform/odom/filtered$" && \
+    echo "Nav2 Costmap:" && ros2 topic list | grep -c "^/j100/global_costmap/costmap$" && \
+    echo "Camera RGB:" && ros2 topic list | grep -c "^/j100/sensors/camera_0/color/image$" && \
+    echo "Camera Depth:" && ros2 topic list | grep -c "^/j100/sensors/camera_0/depth/image$" && \
+    echo "✓ All critical topics present!" || echo "✗ Some topics missing"

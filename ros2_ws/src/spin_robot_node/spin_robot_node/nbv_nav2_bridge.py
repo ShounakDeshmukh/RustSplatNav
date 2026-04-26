@@ -16,7 +16,7 @@ class NbvNav2Bridge(Node):
         self.declare_parameter('nbv_topic', '/gaussmi/nbv_pose')
         self.declare_parameter('goal_frame', 'map')
         self.declare_parameter('goal_preempt_threshold', 0.20)
-        self.declare_parameter('navigate_action', '/navigate_to_pose')
+        self.declare_parameter('navigate_action', '/j100/navigate_to_pose')
         self.declare_parameter('server_wait_sec', 30.0)
 
         self._nbv_topic = str(self.get_parameter('nbv_topic').value)
@@ -41,33 +41,40 @@ class NbvNav2Bridge(Node):
     def _on_nbv(self, msg: PoseStamped) -> None:
         msg.header.frame_id = self._goal_frame
         self._latest_goal = msg
+        self.get_logger().debug(
+            f'NBV bridge received goal: x={msg.pose.position.x:.2f} y={msg.pose.position.y:.2f} z={msg.pose.position.z:.2f}'
+        )
 
     def _tick(self) -> None:
         if not self._server_ready:
             if self._client.wait_for_server(timeout_sec=self._server_wait_sec):
                 self._server_ready = True
-                self.get_logger().info(f'Connected to {self._action_name}')
+                self.get_logger().info(f'✓ Connected to {self._action_name}')
             else:
+                self.get_logger().warn(f'✗ Waiting for {self._action_name} server...')
                 return
 
         if self._latest_goal is None:
+            self.get_logger().debug('Waiting for first NBV goal...')
             return
 
         if self._active_goal is not None and _goal_distance(self._active_goal, self._latest_goal) < self._goal_preempt_threshold:
+            self.get_logger().debug('Current goal too close to latest, skipping')
             return
 
         if self._goal_handle is not None:
             try:
+                self.get_logger().info('Cancelling previous goal to send new one')
                 cancel_future = self._goal_handle.cancel_goal_async()
                 cancel_future.add_done_callback(lambda _: None)
-            except Exception:
-                pass
+            except Exception as exc:
+                self.get_logger().error(f'Failed to cancel goal: {exc}')
             self._goal_handle = None
 
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = self._latest_goal
         self.get_logger().info(
-            f'Sending NBV goal x={goal_msg.pose.pose.position.x:.2f} y={goal_msg.pose.pose.position.y:.2f}'
+            f'→ Sending NBV goal: x={goal_msg.pose.pose.position.x:.3f} y={goal_msg.pose.pose.position.y:.3f} z={goal_msg.pose.pose.position.z:.3f}'
         )
         send_future = self._client.send_goal_async(goal_msg)
         send_future.add_done_callback(self._on_goal_response)
@@ -75,12 +82,12 @@ class NbvNav2Bridge(Node):
     def _on_goal_response(self, future) -> None:
         goal_handle = future.result()
         if not goal_handle.accepted:
-            self.get_logger().warn('Nav2 rejected the NBV goal')
+            self.get_logger().warn('✗ Nav2 REJECTED the NBV goal')
             return
 
         self._goal_handle = goal_handle
         self._active_goal = self._latest_goal
-        self.get_logger().info('NBV goal accepted by Nav2')
+        self.get_logger().info('✓ NBV goal ACCEPTED by Nav2, robot moving...')
 
 
 def _goal_distance(a: PoseStamped, b: PoseStamped) -> float:
