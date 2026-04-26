@@ -31,17 +31,9 @@ launch-nav2-nbv:
     bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && cd /workspace && colcon build --packages-select spin_robot_node --symlink-install && source install/setup.bash && ros2 launch spin_robot_node clearpath_nav2_nbv.launch.py'
 
 # Launch the Jackal simulation using hardware OpenGL by default.
-# `renderer` can be `ogre` or `ogre2`.
-launch-sim rviz="" renderer="ogre2" extra_args="":
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 LIBGL_ALWAYS_SOFTWARE=0 __GLX_VENDOR_LIBRARY_NAME=nvidia GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py setup_path:=/root/clearpath {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }} {{extra_args}}'
-
-# Launch without RViz and request headless Gazebo mode when supported.
-launch-sim-headless:
-    just launch-sim "rviz:=false" "ogre2" "headless:=true gui:=false"
-
-# Launch with software rendering (use only when hardware GL is unavailable).
-launch-sim-software rviz="" renderer="ogre" extra_args="":
-    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py setup_path:=/root/clearpath {{ if rviz == "rviz" { "rviz:=true" } else { rviz } }} {{extra_args}}'
+# Single canonical command for GUI simulation. `renderer` can be `ogre` or `ogre2`.
+launch-sim rviz="" renderer="ogre2]" extra_args="":
+    bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash && mkdir -p /tmp/runtime-root && chmod 700 /tmp/runtime-root && XDG_RUNTIME_DIR=/tmp/runtime-root GZ_PARTITION=jackal_sim IGN_PARTITION=jackal_sim GZ_IP=127.0.0.1 IGN_IP=127.0.0.1 QT_X11_NO_MITSHM=1 GZ_RENDER_ENGINE={{renderer}} IGN_RENDER_ENGINE={{renderer}} ros2 launch clearpath_gz simulation.launch.py setup_path:=/root/clearpath {{ if rviz == "true" { "rviz:=true" } else if rviz == "false" { "rviz:=false" } else { rviz } }} {{extra_args}}'
 
 # List available ROS2 topics
 topics:
