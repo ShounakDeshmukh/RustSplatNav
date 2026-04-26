@@ -1,0 +1,3 @@
+[submodule "gaussmi"]
+	path = gaussmi
+	url = https://github.com/ShounakDeshmukh/GauSS-MI-splatnav.git
