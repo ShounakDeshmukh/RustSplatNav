@@ -37,8 +37,19 @@ sensors:
           camera_name: camera_0
           device_type: d435
           serial_no: "0"
+          
+          # High Detail RGB
           enable_color: true
-          rgb_camera.color_profile: 640,480,30
+          rgb_camera.color_profile: 1280,720,30
+          
+          # Detailed & Correct Depth
           enable_depth: true
-          depth_module.depth_profile: 640,480,15
+          depth_module.depth_profile: 1280,720,30
+          
+          # Alignment & Cloud (Crucial for "Canonical" Accuracy)
+          align_depth.enable: true
           pointcloud.enable: true
+          pointcloud.ordered_pc: true
+          
+          # Simulation Range Fix
+          clip_distance: 10.0
